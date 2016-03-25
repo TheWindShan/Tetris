@@ -1,0 +1,53 @@
+#ifndef __HELLOWORLD_SCENE_H__
+#define __HELLOWORLD_SCENE_H__
+
+#include "cocos2d.h"
+#include "GemeDefine.h"
+#include "ui/CocosGui.h"
+#include "cocos-ext.h"
+class HelloWorld : public cocos2d::Layer
+{
+public:
+    static cocos2d::Scene* createScene();
+private:
+    HelloWorld();
+    ~HelloWorld();
+    virtual bool init();
+    void updateDown(float dt);
+    void updateLeft(float dt);
+    void updateRight(float dt);
+    void updateNextType();
+    void updateUI();
+    void newTetris();
+    void reStart();
+    void touchAction(Ref *pSender, cocos2d::extension::Control::EventType type);
+    void touchButtonAction(Ref *pSender, cocos2d::ui::Widget::TouchEventType type);
+    void touchDownCallBack(float dt);
+    void removeFullRow();
+    void setAutoDownSpeed(float speed);
+    
+    CREATE_FUNC(HelloWorld);
+private:
+
+    struct BOARD
+    {
+        int var;
+        int color;
+    }m_num_map[ROW][COL];
+    
+    int     m_cur_type;
+    int     m_next_type;
+    int     m_cur_row;      //4x4方块左下角位置
+    int     m_cur_col;      //
+    int     m_max_row;
+    bool    m_is_down;      //自动下落是否成功
+    bool    m_game_over;
+    float   delay_time;
+    int     m_score;
+    cocos2d::Label*         m_score_label;
+    cocos2d::Sprite*        m_panle_bg;
+    cocos2d::Sprite*        m_sprite_map[ROW][COL];
+    
+};
+
+#endif // __HELLOWORLD_SCENE_H__
