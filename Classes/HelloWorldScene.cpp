@@ -1,5 +1,5 @@
 #include "HelloWorldScene.h"
-
+#include "AudioEngine.h"
 USING_NS_CC;
 USING_NS_CC_EXT;
 
@@ -138,8 +138,13 @@ HelloWorld::HelloWorld()
 , m_cur_row(-1)
 , m_cur_col(-1)
 , m_max_row(-1)
-, delay_time(1.0)
+, delay_time(1.0f)
 , m_score(0)
+, m_score_label(nullptr)
+, m_is_down(false)
+, m_game_over(false)
+, m_total_row(0)
+, m_effect_volume(1.0f)
 {
     for (int row = 0; row < ROW; row++)
     {
@@ -170,18 +175,35 @@ bool HelloWorld::init()
     {
         return false;
     }
+    cocos2d::experimental::AudioEngine::play2d("sound/m_game_bg.mp3",true);
+    
     Size win_size = Director::getInstance()->getWinSize();
     auto game_bg = Sprite::create("scene_bg.jpg");
     addChild(game_bg);
     game_bg->setPosition(win_size * 0.5f);
+    Size bg_size = game_bg->getContentSize();
+    float scaleHeight = win_size.height/bg_size.height;
+    float scaleWidth = win_size.width/bg_size.width;
+    game_bg->setScale(MAX(scaleHeight,scaleWidth));
 
     m_panle_bg = Sprite::create("layer_bg.png");
     addChild(m_panle_bg);
     m_panle_bg->setPosition(win_size.width * 0.5f,win_size.height * 0.5f);
     
-    m_score_label = Label::createWithSystemFont("分数:0", "", 30);
+    auto cur_score = Sprite::create("cur_score.png");
+    cur_score->setAnchorPoint(Vec2(1,0.5));
+    cur_score->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 120));
+    addChild(cur_score);
+    
+    auto hight_score = Sprite::create("high_score.png");
+    hight_score->setAnchorPoint(Vec2(1,0.5));
+    hight_score->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 60));
+    addChild(hight_score);
+
+    m_score_label = Label::createWithSystemFont("0", "", 40);
     addChild(m_score_label);
-    m_score_label->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 100));
+    m_score_label->setAnchorPoint(Vec2(0,0.5));
+    m_score_label->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 120));
     m_score_label->setColor(Color3B::YELLOW);
 
 
@@ -196,7 +218,10 @@ bool HelloWorld::init()
         }
     }
     
-    reStart();
+    auto music = ui::CheckBox::create("btn_sound_open.png", "btn_sound_close.png");
+    music->setPosition(Vec2(win_size.width - 65,win_size.height - 100));
+    music->addEventListener(CC_CALLBACK_2(HelloWorld::checkBoxCallBack, this));
+    addChild(music);
     
     auto btn_restart = ui::Button::create("btn_pause.png");
     btn_restart->addTouchEventListener(CC_CALLBACK_2(HelloWorld::touchButtonAction, this));
@@ -206,11 +231,11 @@ bool HelloWorld::init()
     auto btn_rorate = ui::Button::create("btn_rorate.png");
     btn_rorate->addTouchEventListener(CC_CALLBACK_2(HelloWorld::touchButtonAction, this));
     addChild(btn_rorate,1,10);
-    btn_rorate->setPosition(Vec2(70,250));
+    btn_rorate->setPosition(Vec2(win_size.width - 65,450));
     
     auto btn_left = ControlButton::create(ui::Scale9Sprite::create("btn_left.png"));
     addChild(btn_left,10,100);
-    btn_left->setPosition(Vec2(70,100));
+    btn_left->setPosition(Vec2(65,300));
     btn_left->addTargetWithActionForControlEvents(this, cccontrol_selector(HelloWorld::touchAction),
                                                   Control::EventType::TOUCH_DOWN
                                                   | Control::EventType::TOUCH_UP_INSIDE
@@ -218,7 +243,7 @@ bool HelloWorld::init()
                                                   | Control::EventType::TOUCH_CANCEL
                                                   | Control::EventType::DRAG_OUTSIDE);
     auto btn_right = ControlButton::create(ui::Scale9Sprite::create("btn_right.png"));
-    btn_right->setPosition(Vec2(win_size.width - 70, 100));
+    btn_right->setPosition(Vec2(win_size.width - 65, 300));
     addChild(btn_right,20,101);
     btn_right->addTargetWithActionForControlEvents(this, cccontrol_selector(HelloWorld::touchAction),
                                                    Control::EventType::TOUCH_DOWN
@@ -228,7 +253,7 @@ bool HelloWorld::init()
                                                    | Control::EventType::DRAG_OUTSIDE);
 
     auto btn_down = ControlButton::create(ui::Scale9Sprite::create("btn_down.png"));
-    btn_down->setPosition(Vec2(win_size.width - 70,250));
+    btn_down->setPosition(Vec2(65,450));
     addChild(btn_down,30,102);
     btn_down->addTargetWithActionForControlEvents(this, cccontrol_selector(HelloWorld::touchAction),
                                                   Control::EventType::TOUCH_DOWN
@@ -238,9 +263,30 @@ bool HelloWorld::init()
                                                   | Control::EventType::DRAG_OUTSIDE);
     
 
-    
+    reStart();
     
     return true;
+}
+
+void HelloWorld::checkBoxCallBack(Ref *pSender,ui::CheckBox::EventType type)
+{
+    switch (type)
+    {
+        case ui::CheckBox::EventType::SELECTED:
+        {
+            cocos2d::experimental::AudioEngine::pauseAll();
+            m_effect_volume = 0;
+        }
+            break;
+        case ui::CheckBox::EventType::UNSELECTED:
+        {
+            cocos2d::experimental::AudioEngine::resumeAll();
+            m_effect_volume = 1.0f;
+        }
+            break;
+        default:
+            break;
+    }
 }
 
 void HelloWorld::touchButtonAction(Ref *pSender, ui::Widget::TouchEventType type)
@@ -250,6 +296,7 @@ void HelloWorld::touchButtonAction(Ref *pSender, ui::Widget::TouchEventType type
     {
         if (tag == 10)
         {
+            cocos2d::experimental::AudioEngine::play2d("sound/s_change.wav",false,m_effect_volume);
             updateNextType();
         }
         else if (tag == 11)
@@ -268,12 +315,14 @@ void HelloWorld::touchAction(Ref *pSender, cocos2d::extension::Control::EventTyp
         {
             case 100:
                 schedule(schedule_selector(HelloWorld::updateLeft), 0.1);
+                cocos2d::experimental::AudioEngine::play2d("sound/s_move.wav",false,m_effect_volume);
                 break;
             case 101:
                 schedule(schedule_selector(HelloWorld::updateRight), 0.1);
+                cocos2d::experimental::AudioEngine::play2d("sound/s_move.wav",false,m_effect_volume);
                 break;
             case 102:
-                unschedule(schedule_selector(HelloWorld::updateDown));
+//                unschedule(schedule_selector(HelloWorld::updateDown));
                 schedule(schedule_selector(HelloWorld::touchDownCallBack), 0.03);
                 break;
             default:
@@ -291,7 +340,7 @@ void HelloWorld::touchAction(Ref *pSender, cocos2d::extension::Control::EventTyp
                 updateRight(0);
                 break;
             case 102:
-                updateDown(0);
+//                updateDown(0);
                 break;
             default:
                 break;
@@ -312,10 +361,10 @@ void HelloWorld::touchAction(Ref *pSender, cocos2d::extension::Control::EventTyp
                 break;
             case 102:
                 unschedule(schedule_selector(HelloWorld::touchDownCallBack));
-                if (!isScheduled(schedule_selector(HelloWorld::updateDown)))
-                {
-                    schedule(schedule_selector(HelloWorld::updateDown), delay_time);
-                }
+//                if (!isScheduled(schedule_selector(HelloWorld::updateDown)))
+//                {
+//                    schedule(schedule_selector(HelloWorld::updateDown), delay_time);
+//                }
                 break;
             default:
                 break;
@@ -395,12 +444,18 @@ void HelloWorld::reStart()
     }
     m_cur_type = -1;
     m_max_row = -1;
+    delay_time = 1.0f;
+    m_total_row = 0;
     updateUI();
     newTetris();
     if(!isScheduled(schedule_selector(HelloWorld::updateDown)))
     {
         schedule(schedule_selector(HelloWorld::updateDown), delay_time);
     }
+    static_cast<ControlButton*>(this->getChildByTag(100))->setEnabled(true);
+    static_cast<ControlButton*>(this->getChildByTag(101))->setEnabled(true);
+    static_cast<ControlButton*>(this->getChildByTag(102))->setEnabled(true);
+    static_cast<ui::Button*>(this->getChildByTag(10))->setEnabled(true);
 }
 
 
@@ -450,6 +505,7 @@ void HelloWorld::removeFullRow()
             cleanRow->setPosition(START_X + 2 * CELL_SIZE, START_Y + firstRow * CELL_SIZE);
             cleanRow->setScale(0.5f);
             cleanRow->runAction(Sequence::create(MoveBy::create(0.2f, Vec2(CELL_SIZE*8,0)),RemoveSelf::create(0.1f), NULL));
+            cocos2d::experimental::AudioEngine::play2d("sound/s_clean.mp3",false,m_effect_volume);
             int add_score;
             switch (rowNum)
             {
@@ -457,16 +513,17 @@ void HelloWorld::removeFullRow()
                     add_score = 10;
                     break;
                 case 2:
-                    add_score = 20;
+                    add_score = 30;
                     break;
                 case 3:
-                    add_score = 40;
+                    add_score = 60;
                     break;
                 case 4:
-                    add_score = 80;
+                    add_score = 100;
                 default:
                     break;
             }
+            m_total_row += rowNum;
             m_score += add_score;
             auto strAdd = __String::createWithFormat("+ %d",add_score);
             auto add_label = Label::createWithSystemFont(strAdd->getCString(), "", 30);
@@ -474,13 +531,208 @@ void HelloWorld::removeFullRow()
             add_label->setColor(Color3B::RED);
             add_label->setPosition(_director->getWinSize()/2);
             add_label->runAction(Sequence::create(ScaleTo::create(0.5f, 5.0f),RemoveSelf::create(0.1f), NULL));
-            auto strScore = __String::createWithFormat("分数:%d",m_score);
+            auto strScore = __String::createWithFormat("%d",m_score);
             m_score_label->setString(strScore->getCString());
         }
         
     }while(0);
 }
-
+bool HelloWorld::checkNextTepDown()
+{
+    bool bDown = true;
+    do
+    {
+        if(m_cur_row <= 0)
+        {
+            bDown = false;
+            break;
+        }
+        switch (m_cur_type)
+        {
+            case 0:
+            {
+                if(m_num_map[m_cur_row - 1][m_cur_col].var)
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 1:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 2].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 3].var)
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 2:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 2].var)
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 3:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||(m_cur_row < ROW - 1 && m_num_map[m_cur_row + 1][m_cur_col + 1].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 4:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col + 2].var
+                    ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col].var)
+                    ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col + 1].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 5:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 1].var)
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 6:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 2].var)
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 7:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||(m_num_map[m_cur_row - 1][m_cur_col + 1].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 8:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col + 1].var)
+                    ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col + 2].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 9:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||(m_cur_row < ROW - 1 && m_num_map[m_cur_row + 1][m_cur_col].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 10:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 2].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 11:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 12:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 2].var
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 13:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 1].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 14:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 2].var)
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 15:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 1].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 16:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var)
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 2].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 17:
+            {
+                if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
+                    ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var))
+                {
+                    bDown = false;
+                }
+            }
+                break;
+            case 18:
+                if (m_num_map[m_cur_row - 1][m_cur_col].var
+                    ||m_num_map[m_cur_row - 1][m_cur_col + 1].var)
+                {
+                    bDown = false;
+                }
+                break;
+            default:
+                break;
+        }
+    }while(0);
+    return bDown;
+}
 void HelloWorld::updateDown(float dt)
 {
     do{
@@ -1041,23 +1293,28 @@ void HelloWorld::updateDown(float dt)
         if (m_game_over)
         {
             this->unschedule(schedule_selector(HelloWorld::updateDown));
+            static_cast<ControlButton*>(this->getChildByTag(100))->setEnabled(false);
+            static_cast<ControlButton*>(this->getChildByTag(101))->setEnabled(false);
+            static_cast<ControlButton*>(this->getChildByTag(102))->setEnabled(false);
+            static_cast<ui::Button*>(this->getChildByTag(10))->setEnabled(false);
+            cocos2d::experimental::AudioEngine::play2d("sound/s_gameover.wav",false,m_effect_volume);
             log("game over");
             break;
         }
-        
         if (!m_is_down)
         {
-//            m_panle_bg->runAction(Sequence::create(MoveBy::create(0.1, Vec2(0,30)),
-//                                                   MoveBy::create(0.1, Vec2(0,-30)),
-//                                                   MoveBy::create(0.1, Vec2(0,20)),
-//                                                   MoveBy::create(0.1, Vec2(0,-20)),
-//                                                   NULL));
             newTetris();
             break;
         }
-        
         m_cur_row--;
         updateUI();
+        if (isScheduled(schedule_selector(HelloWorld::touchDownCallBack))
+            && !checkNextTepDown())
+        {
+            cocos2d::experimental::AudioEngine::play2d("sound/s_fast_down.wav",false,m_effect_volume);
+            m_panle_bg->runAction(Sequence::create(MoveBy::create(0.05f, Vec2(0,10)),
+                                                   MoveBy::create(0.05f, Vec2(0,-10)),nullptr));
+        }
     }while (0);
 
 }

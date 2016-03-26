@@ -25,7 +25,8 @@ private:
     void touchDownCallBack(float dt);
     void removeFullRow();
     void setAutoDownSpeed(float speed);
-    
+    bool checkNextTepDown();
+    void checkBoxCallBack(Ref *pSender,cocos2d::ui::CheckBox::EventType type);
     CREATE_FUNC(HelloWorld);
 private:
 
@@ -44,6 +45,8 @@ private:
     bool    m_game_over;
     float   delay_time;
     int     m_score;
+    int     m_total_row;
+    float   m_effect_volume;
     cocos2d::Label*         m_score_label;
     cocos2d::Sprite*        m_panle_bg;
     cocos2d::Sprite*        m_sprite_map[ROW][COL];

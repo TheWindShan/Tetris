@@ -18,7 +18,8 @@ public:
     virtual bool init();
     CREATE_FUNC(MenuScene);
 private:
-    void tetrisCallBack();
+    void newGameCallBack();
+    void continueCallBack();
 };
 
 

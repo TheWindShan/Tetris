@@ -29,20 +29,23 @@ bool MenuScene::init()
     menuBackground->setPosition(_director->getWinSize() * 0.5f);
     addChild(menuBackground);
     
-    auto tetrisItem = MenuItemImage::create("menu_tetris.png","menu_tetris.png",CC_CALLBACK_0(MenuScene::tetrisCallBack, this));
-    auto cleanItem = MenuItemImage::create("menu_clean.png","menu_clean.png",CC_CALLBACK_0(MenuScene::tetrisCallBack, this));
-    auto colorItem = MenuItemImage::create("menu_color.png","menu_color.png",CC_CALLBACK_0(MenuScene::tetrisCallBack, this));
-    auto dragItem = MenuItemImage::create("menu_drag.png","menu_drag.png",CC_CALLBACK_0(MenuScene::tetrisCallBack, this));
-    auto hexItem = MenuItemImage::create("menu_hex.png","menu_hex.png",CC_CALLBACK_0(MenuScene::tetrisCallBack, this));
-    auto menu = Menu::create(tetrisItem,cleanItem,colorItem,dragItem,hexItem,nullptr);
+    auto newItem = MenuItemImage::create("menu_newgame_nor.png","menu_newgame_sel.png",CC_CALLBACK_0(MenuScene::newGameCallBack, this));
+    auto continueItem = MenuItemImage::create("menu_continue_nor.png","menu_continue_sel.png",CC_CALLBACK_0(MenuScene::continueCallBack, this));
+    
+    auto menu = Menu::create(newItem,continueItem,nullptr);
     menu->setPosition(_director->getWinSize() * 0.5f);
     menu->alignItemsVerticallyWithPadding(50);
     addChild(menu);
     return true;
 }
 
-void MenuScene::tetrisCallBack()
+void MenuScene::newGameCallBack()
 {
     auto scene = HelloWorld::createScene();
     _director->replaceScene(scene);
+}
+
+void MenuScene::continueCallBack()
+{
+    
 }
