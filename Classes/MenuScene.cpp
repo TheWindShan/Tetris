@@ -36,6 +36,7 @@ bool MenuScene::init()
     menu->setPosition(_director->getWinSize() * 0.5f);
     menu->alignItemsVerticallyWithPadding(50);
     addChild(menu);
+    
     return true;
 }
 

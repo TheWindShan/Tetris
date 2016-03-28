@@ -45,9 +45,11 @@ private:
     bool    m_game_over;
     float   delay_time;
     int     m_score;
+    int     m_high_score;
     int     m_total_row;
     float   m_effect_volume;
     cocos2d::Label*         m_score_label;
+    cocos2d::Label*         m_high_score_label;
     cocos2d::Sprite*        m_panle_bg;
     cocos2d::Sprite*        m_sprite_map[ROW][COL];
     

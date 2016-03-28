@@ -141,10 +141,12 @@ HelloWorld::HelloWorld()
 , delay_time(1.0f)
 , m_score(0)
 , m_score_label(nullptr)
+, m_high_score_label(nullptr)
 , m_is_down(false)
 , m_game_over(false)
 , m_total_row(0)
 , m_effect_volume(1.0f)
+, m_high_score(0)
 {
     for (int row = 0; row < ROW; row++)
     {
@@ -195,16 +197,24 @@ bool HelloWorld::init()
     cur_score->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 120));
     addChild(cur_score);
     
-    auto hight_score = Sprite::create("high_score.png");
-    hight_score->setAnchorPoint(Vec2(1,0.5));
-    hight_score->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 60));
-    addChild(hight_score);
-
     m_score_label = Label::createWithSystemFont("0", "", 40);
     addChild(m_score_label);
     m_score_label->setAnchorPoint(Vec2(0,0.5));
     m_score_label->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 120));
     m_score_label->setColor(Color3B::YELLOW);
+    
+    auto high_score = Sprite::create("high_score.png");
+    high_score->setAnchorPoint(Vec2(1,0.5));
+    high_score->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 60));
+    addChild(high_score);
+
+    m_high_score = UserDefault::getInstance()->getIntegerForKey("high_score",0);
+    auto strHighScore = __String::createWithFormat("%d",m_high_score);
+    m_high_score_label = Label::createWithSystemFont(strHighScore->getCString(), "", 40);
+    addChild(m_high_score_label);
+    m_high_score_label->setAnchorPoint(Vec2(0,0.5));
+    m_high_score_label->setPosition(Vec2(win_size.width * 0.5f,win_size.height - 60));
+    m_high_score_label->setColor(Color3B::YELLOW);
 
 
     for (int row = 0; row < ROW; row++)
@@ -264,6 +274,8 @@ bool HelloWorld::init()
     
 
     reStart();
+    
+    
     
     return true;
 }
@@ -430,6 +442,12 @@ void HelloWorld::updateUI()
             m_sprite_map[row][col]->setTexture(pic_name);
         }
     }
+    auto strScore = __String::createWithFormat("%d",m_score);
+    m_score_label->setString(strScore->getCString());
+    if (m_score > m_high_score)
+    {
+        m_high_score_label->setString(strScore->getCString());
+    }
 }
 
 void HelloWorld::reStart()
@@ -531,8 +549,6 @@ void HelloWorld::removeFullRow()
             add_label->setColor(Color3B::RED);
             add_label->setPosition(_director->getWinSize()/2);
             add_label->runAction(Sequence::create(ScaleTo::create(0.5f, 5.0f),RemoveSelf::create(0.1f), NULL));
-            auto strScore = __String::createWithFormat("%d",m_score);
-            m_score_label->setString(strScore->getCString());
         }
         
     }while(0);
@@ -1298,6 +1314,10 @@ void HelloWorld::updateDown(float dt)
             static_cast<ControlButton*>(this->getChildByTag(102))->setEnabled(false);
             static_cast<ui::Button*>(this->getChildByTag(10))->setEnabled(false);
             cocos2d::experimental::AudioEngine::play2d("sound/s_gameover.wav",false,m_effect_volume);
+            if (m_score > m_high_score)
+            {
+                UserDefault::getInstance()->setIntegerForKey("high_score", m_score);
+            }
             log("game over");
             break;
         }
