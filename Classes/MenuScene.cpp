@@ -48,5 +48,6 @@ void MenuScene::newGameCallBack()
 
 void MenuScene::continueCallBack()
 {
-    
+    auto scene = HelloWorld::createScene();
+    _director->replaceScene(scene);
 }

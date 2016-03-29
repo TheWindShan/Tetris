@@ -27,6 +27,7 @@ private:
     void setAutoDownSpeed(float speed);
     bool checkNextTepDown();
     void checkBoxCallBack(Ref *pSender,cocos2d::ui::CheckBox::EventType type);
+    void gameOver();
     CREATE_FUNC(HelloWorld);
 private:
 
@@ -48,10 +49,12 @@ private:
     int     m_high_score;
     int     m_total_row;
     float   m_effect_volume;
+    cocos2d::Node*          m_next_tetris_node;
     cocos2d::Label*         m_score_label;
     cocos2d::Label*         m_high_score_label;
     cocos2d::Sprite*        m_panle_bg;
     cocos2d::Sprite*        m_sprite_map[ROW][COL];
+    cocos2d::Sprite*        m_next_tetris[4][4];
     
 };
 

@@ -39,7 +39,7 @@ struct Tetris tetris[CELL_TYPE] =
         {1,0,0,0}}, 2, 4    //  口
     },
     {{
-        {0,0,0,0},          //          type 4
+        {0,0,0,0},          //          type 4  next 17
         {0,0,0,0},          //
         {1,1,1,0},          //  口 口 口
         {0,0,1,0}}, 2, 5    //        口
@@ -157,6 +157,13 @@ HelloWorld::HelloWorld()
             m_sprite_map[row][col] = nullptr;
         }
     }
+    for (int r = 0; r < 4; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            m_next_tetris[r][c] = nullptr;
+        }
+    }
 }
 
 HelloWorld::~HelloWorld()
@@ -177,7 +184,6 @@ bool HelloWorld::init()
     {
         return false;
     }
-    cocos2d::experimental::AudioEngine::play2d("sound/m_game_bg.mp3",true);
     
     Size win_size = Director::getInstance()->getWinSize();
     auto game_bg = Sprite::create("scene_bg.jpg");
@@ -228,6 +234,21 @@ bool HelloWorld::init()
         }
     }
     
+    //预览
+    m_next_tetris_node = Node::create();
+    addChild(m_next_tetris_node);
+    m_next_tetris_node->setPosition(Vec2(win_size.width * 0.5f + 110,win_size.height - 50));
+    for (int r = 0; r < 4; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            m_next_tetris[r][c] = Sprite::create("0.png");
+            m_next_tetris[r][c]->setPosition(c * CELL_SIZE, -r * CELL_SIZE);
+            m_next_tetris[r][c]->setScale(SCALE);
+            m_next_tetris_node->addChild(m_next_tetris[r][c]);
+        }
+    }
+    
     auto music = ui::CheckBox::create("btn_sound_open.png", "btn_sound_close.png");
     music->setPosition(Vec2(win_size.width - 65,win_size.height - 100));
     music->addEventListener(CC_CALLBACK_2(HelloWorld::checkBoxCallBack, this));
@@ -274,8 +295,7 @@ bool HelloWorld::init()
     
 
     reStart();
-    
-    
+
     
     return true;
 }
@@ -334,7 +354,6 @@ void HelloWorld::touchAction(Ref *pSender, cocos2d::extension::Control::EventTyp
                 cocos2d::experimental::AudioEngine::play2d("sound/s_move.wav",false,m_effect_volume);
                 break;
             case 102:
-//                unschedule(schedule_selector(HelloWorld::updateDown));
                 schedule(schedule_selector(HelloWorld::touchDownCallBack), 0.03);
                 break;
             default:
@@ -373,10 +392,6 @@ void HelloWorld::touchAction(Ref *pSender, cocos2d::extension::Control::EventTyp
                 break;
             case 102:
                 unschedule(schedule_selector(HelloWorld::touchDownCallBack));
-//                if (!isScheduled(schedule_selector(HelloWorld::updateDown)))
-//                {
-//                    schedule(schedule_selector(HelloWorld::updateDown), delay_time);
-//                }
                 break;
             default:
                 break;
@@ -423,9 +438,15 @@ void HelloWorld::newTetris()
         default:
             break;
     }
+    if (m_max_row >= ROW)
+    {
+        gameOver();
+        return;
+    }
     removeFullRow();
     unschedule(schedule_selector(HelloWorld::touchDownCallBack));
-    m_cur_type = random(0, 18);
+    m_cur_type = m_next_type;
+    m_next_type = random(0, 18);
     m_cur_row = ROW;
     m_cur_col = 4;
     updateDown(0);
@@ -448,6 +469,22 @@ void HelloWorld::updateUI()
     {
         m_high_score_label->setString(strScore->getCString());
     }
+    
+    for (int r = 0; r < 4; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            if(tetris[m_next_type].box[r][c])
+            {
+                sprintf(pic_name, "%d.png",tetris[m_next_type].color);
+                m_next_tetris[r][c]->setTexture(pic_name);
+            }
+            else
+            {
+                m_next_tetris[r][c]->setTexture("0.png");
+            }
+        }
+    }
 }
 
 void HelloWorld::reStart()
@@ -464,26 +501,27 @@ void HelloWorld::reStart()
     m_max_row = -1;
     delay_time = 1.0f;
     m_total_row = 0;
+    m_score = 0;
+    m_next_type = random(0, 18);
     updateUI();
+    setAutoDownSpeed(delay_time);
     newTetris();
-    if(!isScheduled(schedule_selector(HelloWorld::updateDown)))
-    {
-        schedule(schedule_selector(HelloWorld::updateDown), delay_time);
-    }
     static_cast<ControlButton*>(this->getChildByTag(100))->setEnabled(true);
     static_cast<ControlButton*>(this->getChildByTag(101))->setEnabled(true);
     static_cast<ControlButton*>(this->getChildByTag(102))->setEnabled(true);
     static_cast<ui::Button*>(this->getChildByTag(10))->setEnabled(true);
+    cocos2d::experimental::AudioEngine::stopAll();
+    cocos2d::experimental::AudioEngine::play2d("sound/m_game_bg.mp3",true);
 }
 
 
 void HelloWorld::removeFullRow()
 {
     do{
-        CC_BREAK_IF(m_max_row >= ROW || m_max_row < 0);
+        CC_BREAK_IF(m_max_row < 0);
         int rowNum = 0;
         int firstRow = -1;
-        for (int row = m_cur_row; row < m_cur_row + 4; )
+        for (int row = m_cur_row; row <= MIN(m_max_row,m_cur_row + 3); )
         {
             CC_BREAK_IF(m_cur_row >= ROW || m_cur_row < 0);
             bool bRemove = false;
@@ -549,6 +587,31 @@ void HelloWorld::removeFullRow()
             add_label->setColor(Color3B::RED);
             add_label->setPosition(_director->getWinSize()/2);
             add_label->runAction(Sequence::create(ScaleTo::create(0.5f, 5.0f),RemoveSelf::create(0.1f), NULL));
+            if (m_total_row > 1000)
+            {
+                delay_time = 0.1f;
+            }
+            else if(m_total_row > 700)
+            {
+                delay_time = 0.2f;
+            }
+            else if(m_total_row > 400)
+            {
+                delay_time = 0.3f;
+            }
+            else if(m_total_row > 200)
+            {
+                delay_time = 0.4f;
+            }
+            else if(m_total_row > 100)
+            {
+                delay_time = 0.6f;
+            }
+            else if(m_total_row > 50)
+            {
+                delay_time = 0.8f;
+            }
+            setAutoDownSpeed(delay_time);
         }
         
     }while(0);
@@ -765,7 +828,7 @@ void HelloWorld::updateDown(float dt)
             {
                 if (m_num_map[m_cur_row - 1][m_cur_col].var)
                 {
-                    if (m_cur_row > ROW - 4)
+                    if (m_cur_row >= ROW - 4)
                     {
                         m_game_over = true;
                     }
@@ -797,7 +860,7 @@ void HelloWorld::updateDown(float dt)
                     ||m_num_map[m_cur_row - 1][m_cur_col + 3].var)
                 {
                     m_is_down = false;
-                    if (m_cur_row == ROW)
+                    if (m_cur_row >= ROW - 1)
                     {
                         m_game_over = true;
                     }
@@ -829,7 +892,7 @@ void HelloWorld::updateDown(float dt)
                     ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
                     ||m_num_map[m_cur_row - 1][m_cur_col + 2].var)
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -857,7 +920,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col].var
                     ||(m_cur_row < ROW - 1 && m_num_map[m_cur_row + 1][m_cur_col + 1].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -897,7 +960,7 @@ void HelloWorld::updateDown(float dt)
                     ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col].var)
                     ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col + 1].var))
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -925,7 +988,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col].var
                     ||m_num_map[m_cur_row - 1][m_cur_col + 1].var)
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -950,7 +1013,7 @@ void HelloWorld::updateDown(float dt)
                     ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
                     ||m_num_map[m_cur_row - 1][m_cur_col + 2].var)
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -978,7 +1041,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col].var
                     ||(m_num_map[m_cur_row - 1][m_cur_col + 1].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -1003,7 +1066,7 @@ void HelloWorld::updateDown(float dt)
                     ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col + 1].var)
                     ||(m_cur_row < ROW &&m_num_map[m_cur_row][m_cur_col + 2].var))
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -1031,7 +1094,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
                     ||(m_cur_row < ROW - 1 && m_num_map[m_cur_row + 1][m_cur_col].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -1071,7 +1134,7 @@ void HelloWorld::updateDown(float dt)
                     ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 2].var))
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -1099,7 +1162,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -1125,7 +1188,7 @@ void HelloWorld::updateDown(float dt)
                     ||m_num_map[m_cur_row - 1][m_cur_col + 2].var
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var))
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -1153,7 +1216,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col].var
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 1].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -1179,7 +1242,7 @@ void HelloWorld::updateDown(float dt)
                     ||m_num_map[m_cur_row - 1][m_cur_col + 1].var
                     ||m_num_map[m_cur_row - 1][m_cur_col + 2].var)
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -1207,7 +1270,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col].var
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 1].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -1233,7 +1296,7 @@ void HelloWorld::updateDown(float dt)
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var)
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col + 2].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -1261,7 +1324,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col + 1].var
                     ||(m_cur_row < ROW && m_num_map[m_cur_row][m_cur_col].var))
                 {
-                    if (m_cur_row >= ROW - 2)
+                    if (m_cur_row >= ROW - 3)
                     {
                         m_game_over = true;
                     }
@@ -1285,7 +1348,7 @@ void HelloWorld::updateDown(float dt)
                 if (m_num_map[m_cur_row - 1][m_cur_col].var
                     ||m_num_map[m_cur_row - 1][m_cur_col + 1].var)
                 {
-                    if (m_cur_row >= ROW - 1)
+                    if (m_cur_row >= ROW - 2)
                     {
                         m_game_over = true;
                     }
@@ -1308,17 +1371,7 @@ void HelloWorld::updateDown(float dt)
         
         if (m_game_over)
         {
-            this->unschedule(schedule_selector(HelloWorld::updateDown));
-            static_cast<ControlButton*>(this->getChildByTag(100))->setEnabled(false);
-            static_cast<ControlButton*>(this->getChildByTag(101))->setEnabled(false);
-            static_cast<ControlButton*>(this->getChildByTag(102))->setEnabled(false);
-            static_cast<ui::Button*>(this->getChildByTag(10))->setEnabled(false);
-            cocos2d::experimental::AudioEngine::play2d("sound/s_gameover.wav",false,m_effect_volume);
-            if (m_score > m_high_score)
-            {
-                UserDefault::getInstance()->setIntegerForKey("high_score", m_score);
-            }
-            log("game over");
+            gameOver();
             break;
         }
         if (!m_is_down)
@@ -2693,4 +2746,21 @@ void HelloWorld::setAutoDownSpeed(float speed)
     delay_time = speed;
     unschedule(schedule_selector(HelloWorld::updateDown));
     schedule(schedule_selector(HelloWorld::updateDown), delay_time);
+}
+
+void HelloWorld::gameOver()
+{
+    this->unschedule(schedule_selector(HelloWorld::touchDownCallBack));
+    this->unschedule(schedule_selector(HelloWorld::updateDown));
+    static_cast<ControlButton*>(this->getChildByTag(100))->setEnabled(false);
+    static_cast<ControlButton*>(this->getChildByTag(101))->setEnabled(false);
+    static_cast<ControlButton*>(this->getChildByTag(102))->setEnabled(false);
+    static_cast<ui::Button*>(this->getChildByTag(10))->setEnabled(false);
+    cocos2d::experimental::AudioEngine::stopAll();
+    cocos2d::experimental::AudioEngine::play2d("sound/s_gameover.wav",false,m_effect_volume);
+    if (m_score > m_high_score)
+    {
+        UserDefault::getInstance()->setIntegerForKey("high_score", m_score);
+    }
+    log("game over");
 }
