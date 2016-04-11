@@ -1,5 +1,6 @@
 #include "HelloWorldScene.h"
 #include "AudioEngine.h"
+#include "GameOver.h"
 USING_NS_CC;
 USING_NS_CC_EXT;
 
@@ -2763,4 +2764,7 @@ void HelloWorld::gameOver()
         UserDefault::getInstance()->setIntegerForKey("high_score", m_score);
     }
     log("game over");
+    
+    auto gameOver = GameOver::create();
+    this->addChild(gameOver,200);
 }

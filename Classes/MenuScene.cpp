@@ -25,9 +25,14 @@ bool MenuScene::init()
     {
         return false;
     }
-    auto menuBackground = Sprite::create("scene_bg.jpg");
-    menuBackground->setPosition(_director->getWinSize() * 0.5f);
-    addChild(menuBackground);
+    Size win_size = Director::getInstance()->getWinSize();
+    auto game_bg = Sprite::create("scene_bg.jpg");
+    addChild(game_bg);
+    game_bg->setPosition(win_size * 0.5f);
+    Size bg_size = game_bg->getContentSize();
+    float scaleHeight = win_size.height/bg_size.height;
+    float scaleWidth = win_size.width/bg_size.width;
+    game_bg->setScale(MAX(scaleHeight,scaleWidth));
     
     auto newItem = MenuItemImage::create("menu_newgame_nor.png","menu_newgame_sel.png",CC_CALLBACK_0(MenuScene::newGameCallBack, this));
     auto continueItem = MenuItemImage::create("menu_continue_nor.png","menu_continue_sel.png",CC_CALLBACK_0(MenuScene::continueCallBack, this));
